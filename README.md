@@ -55,6 +55,3 @@ pytest tests/
 
 ## Contributing
 Contributions are welcome! Please open issues or submit pull requests for improvements or bug fixes.
-
-## License
-Specify your project license here.
