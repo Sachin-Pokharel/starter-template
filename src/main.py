@@ -12,7 +12,7 @@ async def read_root():
 async def health_check():
     return {"status": "healthy"}
 
-@app.post("/face-detect")
+@app.post("/face-detect-module")
 async def face_detect(file: UploadFile = File(...)):
     if file.content_type not in ["image/jpeg", "image/png"]:
         raise HTTPException(status_code=400, detail="Invalid image type. Only JPEG and PNG are supported.")
