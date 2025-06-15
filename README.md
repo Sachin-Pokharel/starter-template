@@ -29,7 +29,7 @@ This project is a Python-based application structured with modular components, i
 2. (Optional) Create and activate a virtual environment:
    ```bash
    python3 -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   source venv/bin/activate 
    ```
 
 ## Running the Application
