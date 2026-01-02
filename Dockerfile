@@ -1,20 +1,58 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11-slim
+# Development Dockerfile with hot reload and CPU support
+FROM python:3.11.13-slim
 
-# Set the working directory in the container
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    wget \
+    git \
+    curl \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    supervisor \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Add uv to path
+ENV PATH="/root/.local/bin:$PATH"
 
-# Copy the rest of the application code into the container
-COPY ./src ./src
+# Copy uv project files
+COPY pyproject.toml uv.lock ./
 
-# Expose the port FastAPI will run on
-EXPOSE 8000
+# Install dependencies using uv
+RUN uv sync --frozen
 
-# Command to run the FastAPI app with Uvicorn
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Install PaddlePaddle CPU first (before other dependencies)
+RUN uv pip install paddlepaddle==3.2.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+
+# Copy supervisor config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Copy app code (mounted via volume in docker-compose)
+COPY app/ ./app/
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Expose ports for api and streamlit
+EXPOSE 8002 8501
+
+#Expose port for FastAPI
+#EXPOSE 5056
+
+# Run supervisor to manage FastAPI + Streamlit
+# Note: supervisor commands will use python -m uv run
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+#If want to run the app directly, uncomment the following line
+#CMD ["python", "-m", "uv", "run", "app.main:app", "--host", "0.0.0.0", "--port", "5056"]

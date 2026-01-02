@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: starter-template-dev-gpu
+    volumes:
+      # Mount app directory for hot reload
+      - ./app:/app/app
+    ports:
+      - "5056:5056"  # FastAPI
+    environment:
+      - PYTHONPATH=/app
+      - API_BASE_URL=http://localhost:8002/api/v1
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,88 @@
+# Development Dockerfile with hot reload and GPU support
+# FROM nvidia/cuda:12.9.0-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV CUDA_VISIBLE_DEVICES=0
+WORKDIR /app
+
+# Install system dependencies for building Python
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    build-essential \
+    zlib1g-dev \
+    libncurses5-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    libssl-dev \
+    libreadline-dev \
+    libffi-dev \
+    libsqlite3-dev \
+    libbz2-dev \
+    liblzma-dev \
+    wget \
+    git \
+    curl \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    supervisor \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python 3.11.13 from source (without optimizations to speed up build)
+RUN cd /tmp && \
+    wget https://www.python.org/ftp/python/3.11.13/Python-3.11.13.tgz && \
+    tar -xzf Python-3.11.13.tgz && \
+    cd Python-3.11.13 && \
+    ./configure --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make altinstall && \
+    cd / && \
+    rm -rf /tmp/Python-3.11.13*
+
+# Create symbolic links for python
+RUN rm -f /usr/bin/python3.11 /usr/bin/python /usr/bin/pip3 && \
+    ln -s /usr/local/bin/python3.11 /usr/bin/python3.11 && \
+    ln -s /usr/local/bin/python3.11 /usr/bin/python && \
+    python3.11 --version
+
+# Add uv to path
+ENV PATH="/root/.local/bin:$PATH"
+
+# Copy uv project files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies using uv
+RUN uv sync --frozen
+
+# Install PaddlePaddle GPU first (before other dependencies)
+RUN uv pip install paddlepaddle-gpu==3.2.2 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+
+# Copy supervisor config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Copy app code (mounted via volume in docker-compose)
+COPY app/ ./app/
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Expose ports for api and streamlit
+EXPOSE 8002 8501
+
+#Expose port for FastAPI
+#EXPOSE 5056
+
+# Run supervisor to manage FastAPI + Streamlit
+# Note: supervisor commands will use python3.11 -m uv run
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+#If want to run the app directly, uncomment the following line
+#CMD ["python3.11", "-m", "uv", "run", "app.main:app", "--host", "0.0.0.0", "--port", "5056"]

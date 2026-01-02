@@ -1,13 +1,15 @@
-version: "3.9"
-
 services:
-  fastapi-app:
+  app:
     build:
       context: .
-      dockerfile: docker/Dockerfile
-    ports:
-      - "8000:8000"
+      dockerfile: Dockerfile
+    container_name: starter-template-dev
     volumes:
-      - ./src:/app/src
+      # Mount app directory for hot reload
+      - ./app:/app/app
+    ports:
+      - "5056:5056"  # FastAPI
     environment:
-      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - API_BASE_URL=http://localhost:5056/api/v1
+    restart: unless-stopped
